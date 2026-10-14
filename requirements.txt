@@ -7,3 +7,4 @@ transformers>=4.40
 tqdm>=4.66
 huggingface_hub>=0.23
 pytest>=8
+scikit-learn>=1.3

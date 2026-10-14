@@ -25,6 +25,7 @@ PACKAGES = [
     "polars>=1.0",
     "pyarrow>=14",
     "transformers>=4.40",
+    "scikit-learn>=1.3",
     "tqdm>=4.66",
 ]
 
