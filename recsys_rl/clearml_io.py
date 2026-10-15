@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 PROJECT_NAME = os.environ.get("YAMBDA_CLEARML_PROJECT", "TLab-YambdaRL")
 QUEUE_NAME = os.environ.get("YAMBDA_CLEARML_QUEUE", "")
 DATASET_ID = os.environ.get("YAMBDA_DATASET_ID", "")
+# The agent's default image (cuda 12.9.1) ships expired apt keys, so apt cannot
+# install python/git inside it. Same CUDA/Ubuntu line, newer build.
+DOCKER_IMAGE = os.environ.get("YAMBDA_CLEARML_DOCKER", "nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04")
 
 PACKAGES = [
     "clearml>=2.1",
@@ -39,6 +42,9 @@ def add_clearml_arguments(parser) -> None:
                         help="Run on a ClearML agent instead of this machine.")
     parser.add_argument("--queue", default=QUEUE_NAME,
                         help="ClearML queue (default $YAMBDA_CLEARML_QUEUE).")
+    parser.add_argument("--docker", default=DOCKER_IMAGE,
+                        help="Base docker image for the agent (default $YAMBDA_CLEARML_DOCKER "
+                             "or a cuda 12.9 / ubuntu 24.04 runtime image).")
 
 
 def _transfer_launch_state(task, raw, parser, args):
@@ -82,6 +88,8 @@ def clearml_start(task_name: str, raw, parser, args, task_type: str = "training"
         if not args.queue:
             raise RuntimeError("No queue given: pass --queue or set YAMBDA_CLEARML_QUEUE.")
         os.environ["CLEARML_APT_INSTALL"] = ""
+        if args.docker:
+            task.set_base_docker(args.docker)
         # set_packages replaces auto-detection, so every dependency is listed.
         task.set_packages(list(PACKAGES))
         task.execute_remotely(queue_name=args.queue, exit_process=True)
