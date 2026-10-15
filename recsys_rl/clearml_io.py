@@ -41,15 +41,26 @@ def add_clearml_arguments(parser) -> None:
                         help="ClearML queue (default $YAMBDA_CLEARML_QUEUE).")
 
 
-def _transfer_argv(task, raw, parser, args):
-    """The agent gets no command line of its own: carry it as a task parameter."""
-    payload = {"argv": "" if running_on_agent() else " ".join(shlex.quote(a) for a in raw)}
+def _transfer_launch_state(task, raw, parser, args):
+    """Carry the command line and the dataset id to the agent as task parameters.
+
+    The agent has neither our argv nor our environment variables; on the agent
+    `connect` overwrites the payload with the values stored at launch.
+    Returns (args, dataset_id).
+    """
+    on_agent = running_on_agent()
+    payload = {
+        "argv": "" if on_agent else " ".join(shlex.quote(a) for a in raw),
+        "dataset_id": "" if on_agent else DATASET_ID,
+    }
     task.connect(payload, name="Args")
-    if not running_on_agent():
-        return args
+    if not payload["dataset_id"]:
+        raise RuntimeError("No dataset id: set YAMBDA_DATASET_ID before launching.")
+    if not on_agent:
+        return args, payload["dataset_id"]
     if not payload["argv"]:
         raise RuntimeError("No command line stored on the task; re-launch from a current checkout.")
-    return parser.parse_args(shlex.split(payload["argv"]))
+    return parser.parse_args(shlex.split(payload["argv"])), payload["dataset_id"]
 
 
 def clearml_start(task_name: str, raw, parser, args, task_type: str = "training"):
@@ -59,13 +70,13 @@ def clearml_start(task_name: str, raw, parser, args, task_type: str = "training"
     """
     from clearml import Dataset, Task
 
-    if not DATASET_ID:
+    if not running_on_agent() and not DATASET_ID:
         raise RuntimeError("Set YAMBDA_DATASET_ID for a remote run.")
 
     task = Task.init(project_name=PROJECT_NAME, task_name=task_name,
                      task_type=getattr(Task.TaskTypes, task_type),
                      reuse_last_task_id=False)
-    args = _transfer_argv(task, raw, parser, args)
+    args, dataset_id = _transfer_launch_state(task, raw, parser, args)
 
     if not running_on_agent():
         if not args.queue:
@@ -75,7 +86,7 @@ def clearml_start(task_name: str, raw, parser, args, task_type: str = "training"
         task.set_packages(list(PACKAGES))
         task.execute_remotely(queue_name=args.queue, exit_process=True)
 
-    data_dir = Dataset.get(dataset_id=DATASET_ID, alias="yambda-50m").get_local_copy()
+    data_dir = Dataset.get(dataset_id=dataset_id, alias="yambda-50m").get_local_copy()
     logger.info("Dataset materialised at %s", data_dir)
     return task, args, Path(data_dir)
 
