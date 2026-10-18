@@ -28,3 +28,6 @@ PROJECT_MEMORY.md
 
 # Raw ClearML downloads
 Run*/
+
+# ClearML agent console dumps (contain cluster configuration)
+agent_console.log
