@@ -68,10 +68,6 @@ def main() -> None:
     raw = sys.argv[1:]
     parser = build_parser()
     args = parser.parse_args(raw)
-    if not (args.base_checkpoint or args.base_task):
-        parser.error("give --base-task or --base-checkpoint")
-    if not (args.rm_dir or args.rm_task):
-        parser.error("give --rm-task or --rm-dir")
     if args.smoke:
         apply_smoke(args)
 
@@ -80,6 +76,12 @@ def main() -> None:
         task, args, data_dir = clearml_start(TASK_NAME, raw, parser, args)
         if args.smoke:
             apply_smoke(args)
+
+    # Checked after the hand-off: on the agent argv arrives via the task.
+    if not (args.base_checkpoint or args.base_task):
+        parser.error("give --base-task or --base-checkpoint")
+    if not (args.rm_dir or args.rm_task):
+        parser.error("give --rm-task or --rm-dir")
 
     from recsys_rl.stage_rl import run
     from recsys_rl.utils import setup_logging
