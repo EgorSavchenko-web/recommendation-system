@@ -15,6 +15,8 @@ from .metrics import behaviour_stats, event_metrics, target_ranks, user_metrics
 
 logger = logging.getLogger(__name__)
 
+RANK_CHUNK = 2048
+
 
 def autocast(device: torch.device, enabled: bool = True):
     if device.type == "cuda" and enabled:
@@ -55,9 +57,12 @@ def evaluate_next_item(model, corpus: Corpus, start_ts: int, end_ts: int | None,
             h = model.hidden(batch, attention_mask=batch["attention_mask"])
         rows = torch.as_tensor(chunk.rows, device=device)
         cols = torch.as_tensor(chunk.cols, device=device)
-        logits = model.logits(h[rows, cols].float())
+        states = h[rows, cols].float()
         targets = torch.as_tensor(corpus.item[chunk.target_idx], device=device).long()
-        r = target_ranks(logits, targets).float().cpu().numpy()
+        # Rank in slices: [positions x vocabulary] logits are the memory peak.
+        r = torch.cat([target_ranks(model.logits(states[i:i + RANK_CHUNK]),
+                                    targets[i:i + RANK_CHUNK])
+                       for i in range(0, len(targets), RANK_CHUNK)]).float().cpu().numpy()
         r[corpus.item[chunk.target_idx] == OOV_ID] = np.inf
         ranks.append(r)
         idx_all.append(chunk.target_idx)
