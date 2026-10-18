@@ -21,3 +21,10 @@ Thumbs.db
 
 # Local environment
 scripts/env.ps1
+
+# Local working notes (not part of the repository)
+PLAN.md
+PROJECT_MEMORY.md
+
+# Raw ClearML downloads
+Run*/
