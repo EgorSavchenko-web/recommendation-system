@@ -59,13 +59,15 @@ def _transfer_launch_state(task, raw, parser, args):
         "argv": "" if on_agent else " ".join(shlex.quote(a) for a in raw),
         "dataset_id": "" if on_agent else DATASET_ID,
     }
-    task.connect(payload, name="Args")
+    # Own section, so it never mixes with ClearML's argparse bookkeeping.
+    task.connect(payload, name="Launch")
     if not payload["dataset_id"]:
         raise RuntimeError("No dataset id: set YAMBDA_DATASET_ID before launching.")
     if not on_agent:
         return args, payload["dataset_id"]
     if not payload["argv"]:
         raise RuntimeError("No command line stored on the task; re-launch from a current checkout.")
+    print(f"[clearml] restored argv: {payload['argv']}", flush=True)
     return parser.parse_args(shlex.split(payload["argv"])), payload["dataset_id"]
 
 
@@ -81,7 +83,10 @@ def clearml_start(task_name: str, raw, parser, args, task_type: str = "training"
 
     task = Task.init(project_name=PROJECT_NAME, task_name=task_name,
                      task_type=getattr(Task.TaskTypes, task_type),
-                     reuse_last_task_id=False)
+                     reuse_last_task_id=False,
+                     # ClearML's argparse hook re-binds parse_args on the agent to the
+                     # values it captured; ours are restored explicitly instead.
+                     auto_connect_arg_parser=False)
     args, dataset_id = _transfer_launch_state(task, raw, parser, args)
 
     if not running_on_agent():
