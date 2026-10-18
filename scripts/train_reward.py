@@ -52,12 +52,14 @@ def main() -> None:
     raw = sys.argv[1:]
     parser = build_parser()
     args = parser.parse_args(raw)
-    if not (args.base_checkpoint or args.base_task):
-        parser.error("give --base-task or --base-checkpoint")
 
     task, data_dir = None, Path(args.data_dir)
     if args.clearml or running_on_agent():
         task, args, data_dir = clearml_start(TASK_NAME, raw, parser, args)
+
+    # Checked after the hand-off: on the agent argv arrives via the task.
+    if not (args.base_checkpoint or args.base_task):
+        parser.error("give --base-task or --base-checkpoint")
 
     from recsys_rl.stage_reward import run
     from recsys_rl.utils import setup_logging
